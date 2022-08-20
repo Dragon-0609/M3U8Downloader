@@ -101,23 +101,9 @@ namespace M3U8Downloader
 		private static void Merge(int max){
 			RenameFile ("full.ts");
 			RenameFile ("output.mp4");
-			
-			
-			string command = "type ";
-			int last = max - 1;
-			for (int i = 0; i < max; i++) {
-				command += "\"segment_" + i + ".ts\"";
-				if (i != last)
-					command += ", ";
-			}
-			command += " > full.ts";
-
-			Process cmd = new Process ();
-			cmd.StartInfo.FileName = "cmd.exe";
-			cmd.StartInfo.WorkingDirectory = Environment.CurrentDirectory;
-			cmd.StartInfo.Arguments = "/k " + command;
+			CombineMultipleFilesIntoSingleFile(max, "full.ts");
 			Console.WriteLine ("After merge, write to convert to mp4: \nffmpeg -i full.ts -c:v libx264 -preset medium -tune film -crf 23 -strict experimental -c:a aac -b:a 192k output.mp4");
-			cmd.Start ();
+			
 		}
 
 		private static void RenameFile (string file, int count = 1)
@@ -133,6 +119,26 @@ namespace M3U8Downloader
 				else
 				{
 					File.Move (file, destFileName);
+				}
+			}
+		}
+		
+		private static void CombineMultipleFilesIntoSingleFile(int max, string outputFilePath)
+		{
+			string[] inputFilePaths = new string[max];
+			for (int i = 0; i < max; i++) {
+				inputFilePaths[i] = "segment_" + i + ".ts";
+			}
+			
+			using (var outputStream = File.Create(outputFilePath))
+			{
+				foreach (string inputFilePath in inputFilePaths)
+				{
+					using (var inputStream = File.OpenRead(inputFilePath))
+					{
+						// Buffer size can be passed as the second argument.
+						inputStream.CopyTo(outputStream);
+					}
 				}
 			}
 		}
