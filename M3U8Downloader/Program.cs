@@ -1,14 +1,13 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace M3U8Downloader
 {
 	class MainClass
 	{
+		
 		[STAThread]
 		public static void Main (string[] args)
 		{
@@ -20,16 +19,14 @@ namespace M3U8Downloader
 		{
 			int all = 0;
 			string name = "full";
+			int index = 0;
 			if (args.Length == 0)
 			{
 				Console.WriteLine ("Set Main Link\nFor example:\nFrom https://de3.libria.fun/videos/media/ts/9210/6/480/4b74a2ffeb058591dfdc6caffd08953b.m3u8\nto  https://de3.libria.fun/videos/media/ts/9210/6/480/");
 				string main_url = Console.ReadLine ();
 				Console.WriteLine ("Write the path to m3u8");
 				string file = Console.ReadLine ();
-				if (file.StartsWith ("\"") && file.EndsWith ("\""))
-				{
-					file = file.Replace ("\"", "");
-				}
+				file = RemoveQuotes (file);
 
 				name = Path.GetFileNameWithoutExtension (file);
 				Environment.CurrentDirectory = Path.GetDirectoryName (file);
@@ -38,51 +35,65 @@ namespace M3U8Downloader
 									   .Where (line => line.Contains (".ts")).ToArray ();
 				Console.WriteLine ("File parsing end.\nStarting downloading");
 				CleanDestination ();
-				all = DownloadEachSegment (main_url, content);
+				all = DownloadEachSegment (main_url, index, content);
 				Console.WriteLine ("Downloading end");
 
 			} else if (args.Length == 2)
 			{
-				all = int.Parse (args[0]);
-				
+				string[] count = args[0].Split (new char[] { '-' }, StringSplitOptions.None);
+				index = int.Parse (count[0]);
+				all = int.Parse (count[1]);
 				string file = args[1];
-				if (file.StartsWith ("\"") && file.EndsWith ("\""))
-				{
-					file = file.Replace ("\"", "");
-				}
+				file = RemoveQuotes (file);
 
 				Environment.CurrentDirectory = Path.GetDirectoryName (file);
-				if (File.Exists (file))
-					name = Path.GetFileName (file);
+				name = Path.GetFileNameWithoutExtension (file);
+			} else if (args.Length == 3)
+			{
+				index = int.Parse (args[0]);
+				string main_url = args[1]; 
+				string file = args[2];
+				file = RemoveQuotes (file);
+				name = Path.GetFileNameWithoutExtension (file);
+				Environment.CurrentDirectory = Path.GetDirectoryName (file);
+				
+				string[] content = File.ReadAllText (file).Split (new char[] { '\n' }, StringSplitOptions.None)
+									   .Where (line => line.Contains (".ts")).ToArray ();
+				all = DownloadEachSegment (main_url, index, content);
+				
 			} else
 			{
 				Console.WriteLine("Invalid length of arguments. Acceptable: 0 or 2 args");
 			}
 
-			/*
-			Console.WriteLine ("Write first saved file name. Default: Без названия");
-			string rename = Console.ReadLine ();*/
-			/*if (rename.Length == 0)
-				rename = "Без названия";*/
-			// RenameAll (rename, all);
-			Merge (all, name);
+			Merge (all, index, name);
 			Console.ReadKey ();
 		}
+		
+		private static string RemoveQuotes (string file)
+		{
+			if (file.StartsWith ("\"") && file.EndsWith ("\""))
+			{
+				file = file.Replace ("\"", "");
+			}
 
-		private static int DownloadEachSegment(string main_url, string[] content){
-			int i = 0;
+			return file;
+		}
+
+		private static int DownloadEachSegment(string main_url, int index, string[] content){
 			int max = content.Length;
 			WebDownloader downloader = new WebDownloader ();
-			foreach (string line in content) {
-				
-				Task task = downloader.Download (main_url+line, i);
+			for (int i1 = index; i1 < content.Length; i1++)
+			{
+				string line = content[i1];
+				Task task = downloader.Download (main_url + line, i1);
 				task.Wait ();
-				i++;
-				
-				Console.WriteLine ("Downloaded: {0} / {1}",i, max);
+				Console.WriteLine ("Downloaded: {0} / {1}", i1+1, max);
+				// Add ();
 				// Console.ReadLine ();
 			}
-			return i;
+
+			return max;
 		}
 
 		private static void CleanDestination ()
@@ -94,30 +105,12 @@ namespace M3U8Downloader
 			}
 		}
 
-		private static void RenameAll(string baseName, int max){
-			int current = 0;
-			if (baseName.Contains ("(")) {
-				current = int.Parse (baseName.Split (new char[]{ '(', ')' }) [1]);
-			}
-
-			for (int i = 0; i < max; i++) {
-				string path;
-				if (i != 0)
-					path = baseName + " (" + current + ")";
-				else
-					path = baseName;
-				current++;
-				if (File.Exists(path))
-					File.Move (path, "segment_" + i + ".ts");
-			}
-		}
-
-		private static void Merge(int max, string name){
+		private static void Merge(int max, int index, string name){
 			string file = $"{name}.ts";
 			RenameFile (file);
 			string mp4 = $"{name}.mp4";
 			RenameFile (mp4);
-			CombineMultipleFilesIntoSingleFile(max, file);
+			CombineMultipleFilesIntoSingleFile(max, index, file);
 			Console.WriteLine (
 				$"After merge, write to convert to mp4: \nffmpeg -i {file} -c:v libx264 -preset medium -tune film -crf 23 -strict experimental -c:a aac -b:a 192k {mp4}");
 
@@ -140,11 +133,13 @@ namespace M3U8Downloader
 			}
 		}
 		
-		private static void CombineMultipleFilesIntoSingleFile(int max, string outputFilePath)
+		private static void CombineMultipleFilesIntoSingleFile(int max, int index, string outputFilePath)
 		{
-			string[] inputFilePaths = new string[max];
-			for (int i = 0; i < max; i++) {
-				inputFilePaths[i] = "segment_" + i + ".ts";
+			string[] inputFilePaths = new string[max - index];
+			int ind = index;
+			for (int i = 0; i < inputFilePaths.Length; i++) {
+				inputFilePaths[i] = "segment_" + ind + ".ts";
+				ind++;
 			}
 			
 			using (var outputStream = File.Create(outputFilePath))
