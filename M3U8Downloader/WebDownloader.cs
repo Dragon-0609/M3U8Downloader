@@ -10,7 +10,7 @@ namespace M3U8Downloader
 {
 	public class WebDownloader
 	{
-		public async Task Download (string url, int count)
+		public async Task Download (string url, string name, int count)
 		{
 			/*using (WebClient client = new WebClient())
 			{
@@ -37,7 +37,7 @@ namespace M3U8Downloader
 
 			HttpResponseMessage response = await client.PostAsync("http://tools.eti.pw/proxy/", content);
 			
-			using (var fileStream = File.Create($"segment_{count}.ts"))
+			using (var fileStream = File.Create($"{name}_segment_{count}.ts"))
 			{
 				await response.Content.CopyToAsync (fileStream);
 			}
