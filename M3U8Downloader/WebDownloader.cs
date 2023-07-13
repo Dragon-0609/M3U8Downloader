@@ -12,7 +12,7 @@ namespace M3U8Downloader
 	{
 		public async Task Download (string url, string name, int count)
 		{
-			/*using (WebClient client = new WebClient())
+            /*using (WebClient client = new WebClient())
 			{
 				string url = "http://tools.eti.pw/proxy/";
 				client.Encoding = Encoding.UTF8;
@@ -25,25 +25,34 @@ namespace M3U8Downloader
 					stream.Write(r,0,r.length);
 				}
 			}*/
-			
-			HttpClient client = new HttpClient();
-			var values = new Dictionary<string, string>
-			{
-				{ "__proxy_action", "redirect_browse" },
-				{ "url", url }
-			};
+            string filename = $"{name}_segment_{count}.ts";
+            if (MainClass.useProxy)
+            {
 
-			FormUrlEncodedContent content = new FormUrlEncodedContent(values);
+                HttpClient client = new HttpClient();
+                var values = new Dictionary<string, string>
+            {
+                { "__proxy_action", "redirect_browse" },
+                { "url", url }
+            };
 
-			HttpResponseMessage response = await client.PostAsync("http://tools.eti.pw/proxy/", content);
-			
-			using (var fileStream = File.Create($"{name}_segment_{count}.ts"))
-			{
-				await response.Content.CopyToAsync (fileStream);
-			}
+                FormUrlEncodedContent content = new FormUrlEncodedContent(values);
 
-			// Console.WriteLine ("Downloaded");
+                HttpResponseMessage response = await client.PostAsync("http://tools.eti.pw/proxy/", content);
 
-		}
+                using (var fileStream = File.Create(filename))
+                {
+                    await response.Content.CopyToAsync(fileStream);
+                }
+            }
+            else
+            {
+                WebClient client = new WebClient();
+                await client.DownloadFileTaskAsync(new Uri(url), filename);
+            }
+
+            // Console.WriteLine ("Downloaded");
+
+        }
 	}
 }

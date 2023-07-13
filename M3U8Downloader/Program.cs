@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -9,6 +10,7 @@ namespace M3U8Downloader
 	class MainClass
 	{
 		private static string _name;
+        internal static bool useProxy;
 
 		[STAThread]
 		public static void Main (string[] args)
@@ -19,6 +21,8 @@ namespace M3U8Downloader
 
 		private static void RunApp (string[] args)
 		{
+			ServicePointManager.Expect100Continue = true;
+			ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 			int all = 0;
 			_name = "full";
 			int index = 0;
@@ -42,7 +46,12 @@ namespace M3U8Downloader
 				all = DownloadEachSegment (main_url, index, content);
 				Console.WriteLine ("Downloading end");
 
-			} else if (args.Length == 2)
+			}else if (args.Length == 1)
+            {
+                string pa = args [0].ToLower();
+                useProxy = pa == "p" || pa == "proxy";
+            }
+            else if (args.Length == 2)
 			{
 				string[] count = args[0].Split (new char[] { '-' }, StringSplitOptions.None);
 				index = int.Parse (count[0]);
